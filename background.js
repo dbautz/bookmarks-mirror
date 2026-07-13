@@ -15,12 +15,17 @@ async function sha256(text) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
 // Throws on anything malformed. Returns the number of bookmarks (not folders) seen,
 // which the caller uses as the refuse-to-wipe failsafe.
+//
+// A node is a single-key mapping whose value decides what it is:
+//   - Proxmox VE: https://…      string  -> bookmark
+//   - Infrastructure:            list    -> folder
+//       - …
 function validate(doc) {
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    throw new Error("top level must be an object keyed by root name");
-  }
+  if (!isPlainObject(doc)) throw new Error("top level must be a mapping of root names");
 
   const names = Object.keys(doc);
   if (names.length === 0) throw new Error("no roots declared");
@@ -33,23 +38,27 @@ function validate(doc) {
   let bookmarks = 0;
 
   const walk = (nodes, path) => {
-    if (!Array.isArray(nodes)) throw new Error(`${path} must be an array`);
+    if (!Array.isArray(nodes)) throw new Error(`${path} must be a list`);
+
     nodes.forEach((node, i) => {
       const here = `${path}[${i}]`;
-      if (node === null || typeof node !== "object") throw new Error(`${here} must be an object`);
-      if (typeof node.title !== "string" || node.title === "") throw new Error(`${here} needs a title`);
+      if (!isPlainObject(node)) throw new Error(`${here} must be a "name: value" mapping`);
 
-      const isFolder = "children" in node;
-      const isBookmark = "url" in node;
-      if (isFolder && isBookmark) throw new Error(`${here} has both url and children`);
+      const keys = Object.keys(node);
+      if (keys.length !== 1) {
+        throw new Error(`${here} must have exactly one key, found ${keys.length}: ${keys.join(", ")}`);
+      }
 
-      if (isFolder) {
-        walk(node.children, `${here}.children`);
-      } else if (isBookmark) {
-        if (typeof node.url !== "string" || node.url === "") throw new Error(`${here} needs a url`);
+      const title = keys[0];
+      const value = node[title];
+
+      if (typeof value === "string") {
+        if (value === "") throw new Error(`${here} "${title}" has an empty url`);
         bookmarks += 1;
+      } else if (Array.isArray(value)) {
+        walk(value, `${here} "${title}"`);
       } else {
-        throw new Error(`${here} has neither url nor children`);
+        throw new Error(`${here} "${title}" must map to a url string or a list of children`);
       }
     });
   };
@@ -63,11 +72,14 @@ function validate(doc) {
 // is what preserves the order of the file.
 async function create(parentId, nodes) {
   for (const node of nodes) {
-    if ("children" in node) {
-      const folder = await browser.bookmarks.create({ parentId, title: node.title });
-      await create(folder.id, node.children);
+    const title = Object.keys(node)[0];
+    const value = node[title];
+
+    if (Array.isArray(value)) {
+      const folder = await browser.bookmarks.create({ parentId, title });
+      await create(folder.id, value);
     } else {
-      await browser.bookmarks.create({ parentId, title: node.title, url: node.url });
+      await browser.bookmarks.create({ parentId, title, url: value });
     }
   }
 }
@@ -107,9 +119,9 @@ async function sync() {
 
   let doc;
   try {
-    doc = JSON.parse(text);
+    doc = jsyaml.load(text);
   } catch (err) {
-    return setStatus(false, `invalid JSON: ${err.message}`);
+    return setStatus(false, `invalid YAML: ${err.message}`);
   }
 
   let count;
@@ -120,7 +132,7 @@ async function sync() {
   }
 
   // The failsafe. Applying an empty file would silently delete every bookmark in
-  // every root it names, so a truncated file or a stray "{}" must never be applied.
+  // every root it names, so a truncated file must never be applied.
   if (count === 0) return setStatus(false, "refused: file contains no bookmarks");
 
   // Rebuilding churns bookmark ids, so only do it when the content actually moved.

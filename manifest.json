@@ -15,7 +15,7 @@
   "optional_host_permissions": ["*://*/*"],
 
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["vendor/js-yaml.js", "background.js"]
   },
 
   "action": {
