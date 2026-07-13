@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Bookmarks Mirror</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 2rem; max-width: 40rem; }
+      label { display: block; margin: 1rem 0 0.25rem; font-weight: 600; }
+      input { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+      input[type="number"] { width: 6rem; }
+      .row { margin-top: 1.5rem; display: flex; gap: 0.5rem; align-items: center; }
+      #status { margin-top: 1rem; padding: 0.6rem; border-radius: 4px; background: #eee; }
+      #status.ok { background: #e4f3e4; }
+      #status.err { background: #f7e2e2; }
+      .warn { margin-top: 2rem; padding: 0.75rem; border-left: 3px solid #c0392b; color: #555; }
+    </style>
+  </head>
+  <body>
+    <h1>Bookmarks Mirror</h1>
+
+    <label for="url">Bookmarks JSON URL</label>
+    <input id="url" type="url" placeholder="https://gitea.example.com/user/repo/raw/branch/main/bookmarks.json" />
+
+    <label for="interval">Check every (minutes)</label>
+    <input id="interval" type="number" min="1" value="30" />
+
+    <div class="row">
+      <button id="save">Save</button>
+      <button id="syncNow">Sync now</button>
+    </div>
+
+    <div id="status">Not synced yet.</div>
+
+    <p class="warn">
+      This is a one-way mirror. Every root named in the file is
+      <strong>replaced wholesale</strong> on each change — bookmarks you add in the
+      browser, inside those roots, will be deleted on the next sync. Roots the file
+      does not name are never touched.
+    </p>
+
+    <script src="options.js"></script>
+  </body>
+</html>
