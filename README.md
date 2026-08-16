@@ -40,7 +40,7 @@ One line per bookmark, so pruning is deleting a line — no trailing-comma trap,
 Top-level keys are the browser roots the file owns: `menu`, `toolbar`, `other`,
 `mobile`. **Roots not named in the file are never touched.**
 
-Parsed by the vendored `vendor/js-yaml.js` (4.1.0, MIT, unminified). YAML 1.2 core
+Parsed by `js-yaml`, pinned in `package.json` and bundled at build time. YAML 1.2 core
 schema, so `No:` stays the string `"No"` rather than becoming `false`.
 
 ## Hard rules
@@ -56,14 +56,23 @@ schema, so `No:` stays the string `"No"` rather than becoming `false`.
 
 ## Build
 
+`src/` is the source, `dist/` is generated — esbuild bundles `src/background.js` and
+its one dependency into a single file, the rest is copied. Never edit `dist/`; it is
+gitignored and rebuilt on every command below.
+
 ```sh
-npx web-ext lint                  # must be 0 errors, 0 warnings
-npx web-ext build                 # -> web-ext-artifacts/bookmarks_mirror-<version>.zip
-npx web-ext sign --channel=unlisted --api-key=… --api-secret=…   # AMO signs it; stays private
+npm ci
+npm test                          # the format's accept/refuse rules
+npm run lint                      # build + web-ext lint; must be 0 errors, 0 warnings
+npm run package                   # -> web-ext-artifacts/bookmarks_mirror-<version>.zip
+npm run sign -- --api-key=… --api-secret=…   # AMO signs it; stays unlisted
 ```
 
 Credentials come from the AMO Developer Hub (Manage API Keys); `sign` uploads,
 waits for review and writes the signed `.xpi` next to the build.
+
+The version lives in `src/manifest.json` only — `package.json` is `private` and carries
+no version, so there is nothing to keep in sync.
 
 Release Firefox refuses unsigned extensions. `about:debugging` installs are dropped on
 restart.

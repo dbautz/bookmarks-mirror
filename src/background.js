@@ -1,71 +1,14 @@
 "use strict";
 
-// Firefox's root folder ids. Platform constants, not configuration.
-const ROOTS = {
-  menu: "menu________",
-  toolbar: "toolbar_____",
-  other: "unfiled_____",
-  mobile: "mobile______",
-};
+import { load as parseYaml } from "js-yaml";
+
+import { ROOTS, validate } from "./validate.js";
 
 const DEFAULTS = { url: "", intervalMinutes: 30 };
 
 async function sha256(text) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-
-// Throws on anything malformed. Returns the number of bookmarks (not folders) seen,
-// which the caller uses as the refuse-to-wipe failsafe.
-//
-// A node is a single-key mapping whose value decides what it is:
-//   - Proxmox VE: https://…      string  -> bookmark
-//   - Infrastructure:            list    -> folder
-//       - …
-function validate(doc) {
-  if (!isPlainObject(doc)) throw new Error("top level must be a mapping of root names");
-
-  const names = Object.keys(doc);
-  if (names.length === 0) throw new Error("no roots declared");
-
-  const unknown = names.filter((n) => !(n in ROOTS));
-  if (unknown.length) {
-    throw new Error(`unknown root(s): ${unknown.join(", ")} — expected ${Object.keys(ROOTS).join(", ")}`);
-  }
-
-  let bookmarks = 0;
-
-  const walk = (nodes, path) => {
-    if (!Array.isArray(nodes)) throw new Error(`${path} must be a list`);
-
-    nodes.forEach((node, i) => {
-      const here = `${path}[${i}]`;
-      if (!isPlainObject(node)) throw new Error(`${here} must be a "name: value" mapping`);
-
-      const keys = Object.keys(node);
-      if (keys.length !== 1) {
-        throw new Error(`${here} must have exactly one key, found ${keys.length}: ${keys.join(", ")}`);
-      }
-
-      const title = keys[0];
-      const value = node[title];
-
-      if (typeof value === "string") {
-        if (value === "") throw new Error(`${here} "${title}" has an empty url`);
-        bookmarks += 1;
-      } else if (Array.isArray(value)) {
-        walk(value, `${here} "${title}"`);
-      } else {
-        throw new Error(`${here} "${title}" must map to a url string or a list of children`);
-      }
-    });
-  };
-
-  for (const name of names) walk(doc[name], name);
-
-  return bookmarks;
 }
 
 // Sequential on purpose: browser.bookmarks.create appends, so ordering the awaits
@@ -119,7 +62,7 @@ async function sync() {
 
   let doc;
   try {
-    doc = jsyaml.load(text);
+    doc = parseYaml(text);
   } catch (err) {
     return setStatus(false, `invalid YAML: ${err.message}`);
   }
