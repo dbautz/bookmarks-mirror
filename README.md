@@ -1,7 +1,10 @@
 # bookmarks-mirror
 
-Firefox extension. Pulls a bookmarks JSON file from a URL and mirrors it into the
+Firefox extension. Pulls a bookmarks YAML file from a URL and mirrors it into the
 browser. One-way: it only ever issues `GET`. There is no code path that writes back.
+
+Firefox 140+ (Android 142+) — `optional_host_permissions` and
+`data_collection_permissions` set the floor.
 
 Replaces Floccus for the read-only case — no git client in the browser, no
 credentials, no merge strategy.
@@ -54,9 +57,13 @@ schema, so `No:` stays the string `"No"` rather than becoming `false`.
 ## Build
 
 ```sh
-web-ext lint
-web-ext sign --channel=unlisted --api-key=… --api-secret=…   # AMO signs it; stays private
+npx web-ext lint                  # must be 0 errors, 0 warnings
+npx web-ext build                 # -> web-ext-artifacts/bookmarks_mirror-<version>.zip
+npx web-ext sign --channel=unlisted --api-key=… --api-secret=…   # AMO signs it; stays private
 ```
+
+Credentials come from the AMO Developer Hub (Manage API Keys); `sign` uploads,
+waits for review and writes the signed `.xpi` next to the build.
 
 Release Firefox refuses unsigned extensions. `about:debugging` installs are dropped on
 restart.
