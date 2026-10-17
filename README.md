@@ -65,14 +65,22 @@ npm ci
 npm test                          # the format's accept/refuse rules
 npm run lint                      # build + web-ext lint; must be 0 errors, 0 warnings
 npm run package                   # -> web-ext-artifacts/bookmarks_mirror-<version>.zip
-npm run sign -- --api-key=… --api-secret=…   # AMO signs it; stays unlisted
 ```
-
-Credentials come from the AMO Developer Hub (Manage API Keys); `sign` uploads,
-waits for review and writes the signed `.xpi` next to the build.
 
 The version lives in `src/manifest.json` only — `package.json` is `private` and carries
 no version, so there is nothing to keep in sync.
+
+## Release
+
+Bump `version` in `src/manifest.json`, push. Jenkins (job `bookmarks-mirror`) tests
+every push; when that version has no Gitea release yet it runs `npm run sign` (AMO,
+unlisted) and publishes release `v<version>` with `bookmarks_mirror-<version>.xpi`.
+
+- AMO never signs a version twice — a failed release needs a new version, not a
+  rerun. The signed `.xpi` is also archived on the Jenkins build.
+- Jenkins credentials: `amo-api` (AMO JWT issuer / secret, from Developer Hub →
+  Manage API Keys), `bookmarks-mirror-webhook-token`, and the jenkins bot PAT —
+  which needs **Write** on this repo.
 
 Release Firefox refuses unsigned extensions. `about:debugging` installs are dropped on
 restart.
