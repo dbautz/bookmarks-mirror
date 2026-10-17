@@ -40,6 +40,12 @@ pipeline {
         // AMO Developer Hub API key: username = JWT issuer, password = JWT secret.
         AMO_CREDS   = 'amo-api'
         SOURCE_ZIP  = 'web-ext-artifacts/source.zip'
+        // Public mirror. A deploy key (write, this repo only) rather than a Gitea push
+        // mirror: Gitea 1.26 runs push-mirror addresses through its migration check,
+        // which refuses ssh://. Host key pinned from api.github.com/meta.
+        GITHUB_DEPLOY  = 'github-bookmarks-mirror-deploy'
+        GITHUB_REMOTE  = 'git@github.com:dbautz/bookmarks-mirror.git'
+        GITHUB_HOSTKEY = 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl'
     }
 
     stages {
@@ -65,6 +71,26 @@ pipeline {
                 sh 'npm ci'
                 sh 'npm test'
                 sh 'npm run lint'
+            }
+        }
+
+        // Before the AMO submission: the listing's homepage and the reviewers' test
+        // file point at GitHub, so it must already show this commit.
+        stage('Mirror to GitHub') {
+            steps {
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: env.GITHUB_DEPLOY,
+                    keyFileVariable: 'DEPLOY_KEY'
+                )]) {
+                    sh '''
+                        set -eu
+                        kh=$(mktemp)
+                        trap 'rm -f "$kh"' EXIT
+                        printf '%s\\n' "$GITHUB_HOSTKEY" > "$kh"
+                        GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$kh" \
+                          git push "$GITHUB_REMOTE" "$COMMIT:refs/heads/main"
+                    '''
+                }
             }
         }
 

@@ -84,15 +84,18 @@ The version lives in `src/manifest.json` only.
 
 ## Release
 
-Bump `version` in `src/manifest.json`, push to `main`. Jenkins tests every push;
+Bump `version` in `src/manifest.json`, push to `main`. Jenkins tests every push and
+mirrors `main` to GitHub;
 when that version has no Gitea release yet it submits it to AMO (listed, with
 `amo-metadata.json` and a `git archive` source zip) and creates Gitea release
 `v<version>` with that source zip. AMO reviews, signs and serves the update.
 
 - AMO never accepts a version number twice — a rejected version needs a bump.
 - Jenkins credentials: `amo-api` (AMO JWT issuer / secret),
-  `bookmarks-mirror-webhook-token`, and the jenkins bot PAT, which needs **Write** on
-  this repo.
+  `bookmarks-mirror-webhook-token`, `github-bookmarks-mirror-deploy` (SSH deploy key,
+  write, on the GitHub repo), and the jenkins bot PAT, which needs **Write** on this
+  repo.
+- GitHub is a mirror: change it here, never there — the next push overwrites it.
 
 ## License
 
