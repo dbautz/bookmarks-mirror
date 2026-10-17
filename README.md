@@ -113,18 +113,10 @@ npm run lint           # build + web-ext lint; must be 0 errors, 0 warnings
 npm run package        # -> web-ext-artifacts/bookmarks_mirror-<version>.zip
 ```
 
-## Releasing (maintainer)
+## Contributing
 
-The source of truth is a private Gitea; this GitHub repo is a mirror — changes made
-here are overwritten. Bump `version` in `src/manifest.json` and push to `main`. Jenkins
-tests every push and mirrors it here; when the version has no Gitea release yet it
-submits it to AMO (listed, `amo-metadata.json`, a `git archive` source zip) and creates
-Gitea release `v<version>` with that zip. AMO reviews, signs and ships the update.
-
-- AMO never accepts a version number twice — a rejected version needs a bump.
-- Jenkins credentials: `amo-api` (AMO JWT issuer / secret),
-  `bookmarks-mirror-webhook-token`, `github-bookmarks-mirror-deploy` (SSH deploy key,
-  write, on this repo), and the jenkins bot PAT with **Write** on the Gitea repo.
+Issues are welcome here. This repo is a read-only mirror — pull requests can't be
+merged on GitHub; describe the change in an issue instead.
 
 ## License
 
