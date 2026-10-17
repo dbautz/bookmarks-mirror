@@ -1,0 +1,7 @@
+# Point the add-on at the raw URL of a file like this one.
+# Roots it names (here: toolbar) are replaced; roots it omits are never touched.
+toolbar:
+  - Mirror test:
+      - Mozilla: https://www.mozilla.org/
+      - MDN: https://developer.mozilla.org/
+  - Example: https://example.com/

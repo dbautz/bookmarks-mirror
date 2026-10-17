@@ -1,8 +1,12 @@
-// dbautz/bookmarks-mirror — test every push; sign and release on a version bump.
+// dbautz/bookmarks-mirror — test every push; submit to AMO (listed) on a version bump.
 //
-// The release trigger is the version in src/manifest.json having no Gitea release yet,
-// not a tag or a parameter. AMO refuses to sign a version twice, so "one release per
-// version" is a constraint we inherit anyway — this just makes the bump the button.
+// The trigger is the version in src/manifest.json having no Gitea release yet, not a
+// tag or a parameter. AMO refuses a version number twice on any channel, so "one
+// release per version" is a constraint we inherit anyway — the bump is the button.
+//
+// AMO hosts and signs the listed .xpi after review, so nothing here waits for or
+// downloads it. The Gitea release is the record that a version was submitted, with
+// the exact source zip the reviewers got.
 pipeline {
     agent { label 'jenkins-agent' }
 
@@ -23,7 +27,7 @@ pipeline {
     }
 
     options {
-        timeout(time: 30, unit: 'MINUTES')  // web-ext sign waits up to 15 for AMO review
+        timeout(time: 15, unit: 'MINUTES')
         timestamps()
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
@@ -35,6 +39,7 @@ pipeline {
         GITEA_CREDS = 'a84cd7c3-afea-4071-9bdf-5305ee8d26ee'
         // AMO Developer Hub API key: username = JWT issuer, password = JWT secret.
         AMO_CREDS   = 'amo-api'
+        SOURCE_ZIP  = 'web-ext-artifacts/source.zip'
     }
 
     stages {
@@ -56,6 +61,7 @@ pipeline {
 
         stage('Test') {
             steps {
+                sh 'node --version && npm --version'  // the README promises reviewers these
                 sh 'npm ci'
                 sh 'npm test'
                 sh 'npm run lint'
@@ -86,23 +92,23 @@ pipeline {
             }
         }
 
-        stage('Sign') {
+        stage('Submit to AMO') {
             when { expression { env.RELEASE == 'true' } }
             steps {
+                // Tracked files only: what a reviewer needs to rebuild dist/ byte for
+                // byte (src, lockfile, README with the build steps) and nothing else.
+                sh '''
+                    rm -rf web-ext-artifacts && mkdir web-ext-artifacts
+                    git archive --format=zip -o "$SOURCE_ZIP" HEAD
+                '''
                 withCredentials([usernamePassword(
                     credentialsId: env.AMO_CREDS,
                     usernameVariable: 'WEB_EXT_API_KEY',
                     passwordVariable: 'WEB_EXT_API_SECRET'
                 )]) {
-                    sh '''
-                        rm -rf web-ext-artifacts
-                        npm run sign
-                        mv web-ext-artifacts/*-"$VERSION".xpi web-ext-artifacts/bookmarks_mirror-"$VERSION".xpi
-                    '''
+                    sh 'npm run sign'
                 }
-                // Kept on the build too: once AMO has signed a version it will not sign
-                // it again, so if the publish below fails this is the only copy.
-                archiveArtifacts artifacts: 'web-ext-artifacts/*.xpi', fingerprint: true
+                archiveArtifacts artifacts: env.SOURCE_ZIP, fingerprint: true
             }
         }
 
@@ -114,21 +120,18 @@ pipeline {
                     usernameVariable: 'G_USER',
                     passwordVariable: 'G_TOKEN'
                 )]) {
-                    // A release without its .xpi would read as "released" and every later
-                    // build would skip it, so a failed upload deletes the release again.
+                    // If this fails after AMO accepted the version, the next build
+                    // resubmits and AMO answers 409 — create the release by hand
+                    // (tag v<version>) rather than bumping, the version is already live.
                     sh '''
                         set -eu
-                        xpi="web-ext-artifacts/bookmarks_mirror-$VERSION.xpi"
+                        body="Submitted to addons.mozilla.org for review; Firefox installs and updates it from there."
                         id=$(curl -fsS --user "$G_USER:$G_TOKEN" -H 'Content-Type: application/json' \
-                               -d "{\\"tag_name\\":\\"v$VERSION\\",\\"target_commitish\\":\\"$COMMIT\\",\\"name\\":\\"v$VERSION\\"}" \
+                               -d "{\\"tag_name\\":\\"v$VERSION\\",\\"target_commitish\\":\\"$COMMIT\\",\\"name\\":\\"v$VERSION\\",\\"body\\":\\"$body\\"}" \
                                "$REPO_API/releases" \
                              | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-                        if ! curl -fsS --user "$G_USER:$G_TOKEN" -F "attachment=@$xpi" \
-                               "$REPO_API/releases/$id/assets?name=$(basename "$xpi")" >/dev/null; then
-                            curl -sS -X DELETE --user "$G_USER:$G_TOKEN" "$REPO_API/releases/$id"
-                            echo "upload failed; release v$VERSION removed — xpi is on this build's artifacts" >&2
-                            exit 1
-                        fi
+                        curl -fsS --user "$G_USER:$G_TOKEN" -F "attachment=@$SOURCE_ZIP" \
+                          "$REPO_API/releases/$id/assets?name=bookmarks_mirror-$VERSION-source.zip" >/dev/null
                     '''
                 }
             }
@@ -137,7 +140,7 @@ pipeline {
 
     post {
         success {
-            echo env.RELEASE == 'true' ? "Released v${env.VERSION}"
+            echo env.RELEASE == 'true' ? "Submitted v${env.VERSION} to AMO"
                                        : "v${env.VERSION} already released — tested only"
         }
     }

@@ -4,10 +4,10 @@
   "type": "module",
   "description": "Firefox extension: one-way mirror of a bookmarks YAML file into the browser.",
   "scripts": {
-    "build": "esbuild src/background.js src/options.js --bundle --format=iife --target=firefox140 --outdir=dist && cp src/manifest.json src/options.html dist/",
+    "build": "esbuild src/background.js src/options.js --bundle --format=iife --target=firefox140 --outdir=dist && cp src/manifest.json src/options.html src/icon.svg dist/",
     "lint": "npm run build && web-ext lint --source-dir dist",
     "package": "npm run build && web-ext build --source-dir dist --overwrite-dest",
-    "sign": "npm run build && web-ext sign --source-dir dist --channel=unlisted",
+    "sign": "npm run build && web-ext sign --source-dir dist --channel=listed --amo-metadata amo-metadata.json --upload-source-code web-ext-artifacts/source.zip --approval-timeout=0",
     "test": "node --test \"test/**/*.test.mjs\""
   },
   "dependencies": {
@@ -16,5 +16,9 @@
   "devDependencies": {
     "esbuild": "^0.25.0",
     "web-ext": "^8.3.0"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
   }
 }

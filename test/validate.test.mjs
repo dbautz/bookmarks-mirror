@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { CORE_SCHEMA, load as loadYaml } from "js-yaml";
@@ -91,4 +92,9 @@ test("keeps 1.1 boolean-ish titles as strings", () => {
   const doc = load("menu:\n  - No: https://no.example/\n  - Off: https://off.example/\n");
   assert.deepEqual(Object.keys(doc.menu[0]), ["No"]);
   assert.equal(validate(doc), 2);
+});
+
+// AMO reviewers test against this file; it must stay valid.
+test("example/bookmarks.yml is a valid file", () => {
+  assert.equal(check(readFileSync(new URL("../example/bookmarks.yml", import.meta.url), "utf8")), 3);
 });

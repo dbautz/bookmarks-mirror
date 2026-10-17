@@ -1,35 +1,42 @@
 {
   "manifest_version": 3,
   "name": "Bookmarks Mirror",
-  "version": "1.0.1",
-  "description": "One-way mirror: pulls a bookmarks YAML file from a URL into the browser. Never writes back.",
-
+  "version": "1.0.2",
+  "description": "One-way mirror: keeps your bookmarks in sync with a YAML file at a URL you choose. Never writes back.",
   "browser_specific_settings": {
     "gecko": {
       "id": "bookmarks-mirror@dbautz.com",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
-    },
-    "gecko_android": {
-      "strict_min_version": "142.0"
     }
   },
-
-  "permissions": ["bookmarks", "storage", "alarms"],
-  "optional_host_permissions": ["*://*/*"],
-
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "alarms"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
-
   "action": {
-    "default_title": "Sync bookmarks now"
+    "default_title": "Sync bookmarks now",
+    "default_icon": "icon.svg"
   },
-
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
   }
 }
