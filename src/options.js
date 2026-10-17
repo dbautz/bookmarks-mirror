@@ -1,6 +1,4 @@
-"use strict";
-
-const DEFAULTS = { url: "", intervalMinutes: 30 };
+import { DEFAULTS, parseSourceUrl } from "./settings.js";
 
 const urlInput = document.getElementById("url");
 const intervalInput = document.getElementById("interval");
@@ -17,6 +15,8 @@ function render(status) {
   statusBox.className = status.ok ? "ok" : "err";
 }
 
+const fail = (message) => render({ ok: false, message, at: new Date().toISOString() });
+
 async function load() {
   const { url, intervalMinutes, lastStatus } = await browser.storage.local.get({
     ...DEFAULTS,
@@ -32,13 +32,18 @@ document.getElementById("save").addEventListener("click", async () => {
   const intervalMinutes = Math.max(1, Number(intervalInput.value) || DEFAULTS.intervalMinutes);
 
   // Host access is optional in the manifest, so the extension can only reach the
-  // one origin the user actually points it at.
+  // one host the user actually points it at. No port: Firefox match patterns
+  // cannot carry one, and a pattern with a port matches nothing.
   if (url) {
-    const origin = new URL(url).origin + "/*";
-    const granted = await browser.permissions.request({ origins: [origin] });
-    if (!granted) {
-      render({ ok: false, message: `permission denied for ${origin}`, at: new Date().toISOString() });
-      return;
+    let parsed;
+    try {
+      parsed = parseSourceUrl(url);
+    } catch (err) {
+      return fail(err.message);
+    }
+    const origin = `${parsed.protocol}//${parsed.hostname}/*`;
+    if (!(await browser.permissions.request({ origins: [origin] }))) {
+      return fail(`permission denied for ${origin}`);
     }
   }
 
