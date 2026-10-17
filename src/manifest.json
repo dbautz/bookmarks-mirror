@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bookmarks Mirror",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "One-way mirror: keeps your bookmarks in sync with a YAML file at a URL you choose. Never writes back.",
   "browser_specific_settings": {
     "gecko": {

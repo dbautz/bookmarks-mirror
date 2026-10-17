@@ -1,16 +1,22 @@
 {
   "slug": "bookmarks-mirror",
-  "categories": ["bookmarks"],
+  "categories": [
+    "bookmarks"
+  ],
   "summary": {
-    "en-US": "Keeps your bookmarks in sync with a YAML file at a URL you choose. One-way: the file is the source of truth, nothing is ever sent back."
+    "en-US": "Keep your bookmarks in YAML files at URLs you choose; Firefox mirrors them. One-way: the files are the source of truth, nothing is ever sent back."
   },
   "description": {
-    "en-US": "Maintain your bookmarks as a plain YAML file — in a git repo, on a web server, anywhere reachable over https — and Bookmarks Mirror keeps Firefox in step with it.\n\n• One-way and read-only: the add-on only fetches the file; it never uploads or writes back.\n• Owns only the roots the file names (menu, toolbar, other, mobile); the rest are never touched.\n• Validates the whole file before changing anything: unknown roots, non-web urls and empty roots are refused, so a broken or truncated file never wipes your bookmarks.\n• Host access is requested for the one host you configure, nothing else.\n\nFormat and rules: https://github.com/dbautz/bookmarks-mirror"
+    "en-US": "Write your bookmarks as plain YAML, host the file anywhere reachable over https — a git repo, a web server, a gist — and Bookmarks Mirror keeps Firefox in step with it.\n\n• One-way and read-only: the add-on only fetches; it never uploads or writes back. No account.\n• Several files: list more than one URL and they are combined in order.\n• Owns only the roots the files name (menu, toolbar, other, mobile); the rest are never touched.\n• Validates every file before changing anything: unknown roots, non-web urls and empty roots are refused, and if any file can't be read nothing changes — a broken or truncated file never wipes your bookmarks.\n• Host access is requested only for the hosts you list.\n\nFormat, rules and source: https://github.com/dbautz/bookmarks-mirror"
   },
-  "homepage": { "en-US": "https://github.com/dbautz/bookmarks-mirror" },
-  "support_url": { "en-US": "https://github.com/dbautz/bookmarks-mirror/issues" },
+  "homepage": {
+    "en-US": "https://github.com/dbautz/bookmarks-mirror"
+  },
+  "support_url": {
+    "en-US": "https://github.com/dbautz/bookmarks-mirror/issues"
+  },
   "version": {
     "license": "MIT",
-    "approval_notes": "To test: open the add-on's preferences (they open on install), set the URL to https://raw.githubusercontent.com/dbautz/bookmarks-mirror/main/example/bookmarks.yml, Save (grants host permission for raw.githubusercontent.com), then Sync now. The Bookmarks Toolbar is replaced by a 'Mirror test' folder and one bookmark; other roots are untouched.\n\nThe only network request is a GET of that user-configured URL. Source: background.js and options.js are esbuild bundles (unminified) of src/ plus js-yaml 4.3.2 from package-lock.json; the attached source zip rebuilds them with `npm ci && npm run build` (Node 24, npm 11), see README.md."
+    "approval_notes": "To test: the settings page opens on install (later: click the toolbar button). Paste https://raw.githubusercontent.com/dbautz/bookmarks-mirror/main/example/bookmarks.yml into the URL box, Save (grants host permission for raw.githubusercontent.com), then Sync now. The Bookmarks Toolbar is replaced by a 'Mirror test' folder and one bookmark; other roots are untouched.\n\nThe only network requests are GETs of the user-configured URLs. Source: background.js and options.js are esbuild bundles (unminified) of src/ plus js-yaml 4.3.2 from package-lock.json; the attached source zip rebuilds them with `npm ci && npm run build` (Node 24, npm 11), see README.md."
   }
 }

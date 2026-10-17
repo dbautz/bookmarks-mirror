@@ -1,7 +1,7 @@
 import { CORE_SCHEMA, load as parseYaml } from "js-yaml";
 
-import { DEFAULTS, parseSourceUrl } from "./settings.js";
-import { ROOTS, validate } from "./validate.js";
+import { describeSource, getSettings, parseSourceUrl } from "./settings.js";
+import { MAX_NODES, ROOTS, merge, validate } from "./validate.js";
 
 // A bookmarks file is a few KB; anything this size is not one.
 const MAX_BYTES = 1024 * 1024;
@@ -45,28 +45,20 @@ async function setStatus(ok, message) {
   });
 }
 
-// `force` skips the unchanged-content shortcut, so a manual sync repairs a root that
-// was edited in the browser even though the file did not move.
-async function run({ force }) {
-  const { url } = await browser.storage.local.get(DEFAULTS);
-  if (!url) return setStatus(false, "no URL configured");
-  try {
-    parseSourceUrl(url);
-  } catch (err) {
-    return setStatus(false, err.message);
-  }
+// Fetch, parse and validate one source. Throws a message fit for the status box.
+async function loadSource(url) {
+  parseSourceUrl(url);
 
   let response;
   try {
     response = await fetch(url, { cache: "no-store" });
   } catch (err) {
-    // Offline, VPN down, DNS — leave the existing bookmarks alone.
-    return setStatus(false, `fetch failed: ${err.message}`);
+    throw new Error(`fetch failed: ${err.message}`);
   }
-  if (!response.ok) return setStatus(false, `HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const text = await response.text();
-  if (text.length > MAX_BYTES) return setStatus(false, `refused: file is over ${MAX_BYTES} bytes`);
+  if (text.length > MAX_BYTES) throw new Error(`refused: file is over ${MAX_BYTES} bytes`);
 
   // Core schema: YAML 1.2 typing (`No:` stays a string) and no merge keys or !!omap,
   // the two constructs js-yaml can be made to spend quadratic time on.
@@ -74,28 +66,54 @@ async function run({ force }) {
   try {
     doc = parseYaml(text, { schema: CORE_SCHEMA });
   } catch (err) {
-    return setStatus(false, `invalid YAML: ${err.message}`);
+    throw new Error(`invalid YAML: ${err.message}`);
   }
 
   let count;
   try {
     count = validate(doc);
   } catch (err) {
-    return setStatus(false, `invalid file: ${err.message}`);
+    throw new Error(`invalid file: ${err.message}`);
+  }
+  return { text, doc, count };
+}
+
+// `force` skips the unchanged-content shortcut, so a manual sync repairs a root that
+// was edited in the browser even though no file moved.
+async function run({ force }) {
+  const { sources } = await getSettings();
+  if (sources.length === 0) return setStatus(false, "no source configured");
+
+  // All or nothing. A source that cannot be read (offline, VPN down, broken file)
+  // leaves every root alone: there is no telling which roots it would have filled.
+  const loaded = [];
+  for (const [i, url] of sources.entries()) {
+    try {
+      loaded.push(await loadSource(url));
+    } catch (err) {
+      return setStatus(false, `source ${i + 1} (${describeSource(url)}): ${err.message}`);
+    }
   }
 
-  // Rebuilding churns bookmark ids, so only do it when the content actually moved.
-  const hash = await sha256(text);
+  const count = loaded.reduce((sum, s) => sum + s.count, 0);
+  if (count > MAX_NODES) return setStatus(false, `refused: more than ${MAX_NODES} bookmarks across all sources`);
+  const summary = `${count} bookmarks from ${sources.length} source${sources.length === 1 ? "" : "s"}`;
+
+  // Rebuilding churns bookmark ids, so only do it when some content actually moved.
+  // Ordered, so reordering sources is a real change. NUL-joined: YAML forbids NUL, so
+  // the join is unambiguous, and one source hashes exactly as 1.0.x did — upgrading
+  // does not rebuild.
+  const hash = await sha256(loaded.map((s) => s.text).join("\0"));
   const { lastHash } = await browser.storage.local.get({ lastHash: null });
-  if (!force && hash === lastHash) return setStatus(true, `unchanged (${count} bookmarks)`);
+  if (!force && hash === lastHash) return setStatus(true, `unchanged (${summary})`);
 
   // lastHash is only written after every root is rebuilt, so an interrupted apply
   // is retried on the next sync rather than recorded as done.
-  for (const [name, nodes] of Object.entries(doc)) {
+  for (const [name, nodes] of Object.entries(merge(loaded.map((s) => s.doc)))) {
     await replaceRoot(ROOTS[name], nodes);
   }
   await browser.storage.local.set({ lastHash: hash });
-  return setStatus(true, `synced ${count} bookmarks`);
+  return setStatus(true, `synced ${summary}`);
 }
 
 // One sync at a time. Two overlapping rebuilds of the same root interleave their
@@ -112,7 +130,7 @@ function sync({ force = false } = {}) {
 }
 
 async function rearm() {
-  const { intervalMinutes } = await browser.storage.local.get(DEFAULTS);
+  const { intervalMinutes } = await getSettings();
   await browser.alarms.clear("sync");
   browser.alarms.create("sync", { periodInMinutes: intervalMinutes });
 }
@@ -131,8 +149,8 @@ browser.runtime.onStartup.addListener(async () => {
 
 browser.runtime.onInstalled.addListener(async ({ reason }) => {
   await rearm();
-  const { url } = await browser.storage.local.get(DEFAULTS);
-  if (!url && reason === "install") return browser.runtime.openOptionsPage();
+  const { sources } = await getSettings();
+  if (sources.length === 0 && reason === "install") return browser.runtime.openOptionsPage();
   await sync();
 });
 

@@ -1,6 +1,6 @@
-import { DEFAULTS, parseSourceUrl } from "./settings.js";
+import { DEFAULTS, getSettings, originPattern, parseSourceList } from "./settings.js";
 
-const urlInput = document.getElementById("url");
+const sourcesInput = document.getElementById("sources");
 const intervalInput = document.getElementById("interval");
 const statusBox = document.getElementById("status");
 
@@ -18,36 +18,35 @@ function render(status) {
 const fail = (message) => render({ ok: false, message, at: new Date().toISOString() });
 
 async function load() {
-  const { url, intervalMinutes, lastStatus } = await browser.storage.local.get({
-    ...DEFAULTS,
-    lastStatus: null,
-  });
-  urlInput.value = url;
+  const { sources, intervalMinutes } = await getSettings();
+  const { lastStatus } = await browser.storage.local.get({ lastStatus: null });
+  sourcesInput.value = sources.join("\n");
   intervalInput.value = intervalMinutes;
   render(lastStatus);
 }
 
 document.getElementById("save").addEventListener("click", async () => {
-  const url = urlInput.value.trim();
+  let sources;
+  try {
+    sources = parseSourceList(sourcesInput.value);
+  } catch (err) {
+    return fail(err.message);
+  }
   const intervalMinutes = Math.max(1, Number(intervalInput.value) || DEFAULTS.intervalMinutes);
 
   // Host access is optional in the manifest, so the extension can only reach the
-  // one host the user actually points it at. No port: Firefox match patterns
-  // cannot carry one, and a pattern with a port matches nothing.
-  if (url) {
-    let parsed;
-    try {
-      parsed = parseSourceUrl(url);
-    } catch (err) {
-      return fail(err.message);
-    }
-    const origin = `${parsed.protocol}//${parsed.hostname}/*`;
-    if (!(await browser.permissions.request({ origins: [origin] }))) {
-      return fail(`permission denied for ${origin}`);
+  // hosts the user actually lists. One request, before any await: Firefox only
+  // shows the prompt while the click is still being handled.
+  if (sources.length) {
+    const origins = [...new Set(sources.map(originPattern))];
+    if (!(await browser.permissions.request({ origins }))) {
+      return fail(`permission denied for ${origins.join(", ")}`);
     }
   }
 
-  await browser.storage.local.set({ url, intervalMinutes });
+  await browser.storage.local.set({ sources, intervalMinutes });
+  await browser.storage.local.remove("url");
+  sourcesInput.value = sources.join("\n");
   await browser.runtime.sendMessage("rearm");
   render({ ok: true, message: "settings saved", at: new Date().toISOString() });
 });

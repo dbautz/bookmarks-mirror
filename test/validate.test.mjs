@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { CORE_SCHEMA, load as loadYaml } from "js-yaml";
 
-import { MAX_DEPTH, MAX_NODES, validate } from "../src/validate.js";
+import { MAX_DEPTH, MAX_NODES, merge, validate } from "../src/validate.js";
 
 // Same parse as background.js — the schema is part of what is being tested.
 const load = (text) => loadYaml(text, { schema: CORE_SCHEMA });
@@ -97,4 +97,17 @@ test("keeps 1.1 boolean-ish titles as strings", () => {
 // AMO reviewers test against this file; it must stay valid.
 test("example/bookmarks.yml is a valid file", () => {
   assert.equal(check(readFileSync(new URL("../example/bookmarks.yml", import.meta.url), "utf8")), 3);
+});
+
+test("merge concatenates each root in source order", () => {
+  const a = load("menu:\n  - A: https://a/\ntoolbar:\n  - T: https://t/\n");
+  const b = load("menu:\n  - B: https://b/\nother:\n  - O: https://o/\n");
+  assert.deepEqual(merge([a, b]), {
+    menu: [{ A: "https://a/" }, { B: "https://b/" }],
+    toolbar: [{ T: "https://t/" }],
+    other: [{ O: "https://o/" }],
+  });
+  assert.deepEqual(merge([b, a]).menu, [{ B: "https://b/" }, { A: "https://a/" }]);
+  // The inputs are not touched: a later sync must not see entries doubled.
+  assert.deepEqual(a.menu, [{ A: "https://a/" }]);
 });

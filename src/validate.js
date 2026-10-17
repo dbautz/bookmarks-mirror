@@ -90,3 +90,13 @@ export function validate(doc) {
   }
   return total;
 }
+
+// Several validated documents -> one: each root lists the first source's entries,
+// then the next source's, in the order the sources are configured.
+export function merge(docs) {
+  const merged = {};
+  for (const doc of docs) {
+    for (const [name, nodes] of Object.entries(doc)) (merged[name] ??= []).push(...nodes);
+  }
+  return merged;
+}
