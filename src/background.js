@@ -121,11 +121,8 @@ browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "sync") sync();
 });
 
-browser.action.onClicked.addListener(async () => {
-  const { url } = await browser.storage.local.get(DEFAULTS);
-  if (!url) return browser.runtime.openOptionsPage();
-  return sync({ force: true });
-});
+// The toolbar button opens the settings; "Sync now" lives there, next to the status.
+browser.action.onClicked.addListener(() => browser.runtime.openOptionsPage());
 
 browser.runtime.onStartup.addListener(async () => {
   await rearm();

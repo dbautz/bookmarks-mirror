@@ -28,7 +28,7 @@
     ]
   },
   "action": {
-    "default_title": "Sync bookmarks now",
+    "default_title": "Bookmarks Mirror settings",
     "default_icon": "icon.svg"
   },
   "options_ui": {
